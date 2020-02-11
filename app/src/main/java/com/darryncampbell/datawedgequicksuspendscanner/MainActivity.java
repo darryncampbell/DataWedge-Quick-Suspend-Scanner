@@ -33,8 +33,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     private static final String EXTRA_KEY_NOTIFICATION_TYPE = "com.symbol.datawedge.api.NOTIFICATION_TYPE";
     private static final String EXTRA_SCANNER_STATUS_WAITING = "WAITING";
     private static final String EXTRA_SCANNER_STATUS_SCANNING = "SCANNING";
-    private static final String ACTION_SCANNERINPUTPLUGIN = "com.symbol.datawedge.api.ACTION_SCANNERINPUTPLUGIN";
-    private static final String EXTRA_PARAMETER = "com.symbol.datawedge.api.EXTRA_PARAMETER";
+    private static final String EXTRA_SCANNERINPUTPLUGIN = "com.symbol.datawedge.api.SCANNER_INPUT_PLUGIN";
     private final String EXTRA_PROFILE_NAME = "DW Quick Suspend Profile";
     private final String EXTRA_INTENT_ACTION = "com.zebra.quicksuspendscanner.ACTION";
     private final String LOG_TAG = "DW Quick Suspend";
@@ -195,17 +194,17 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     public void onClick(View view) {
         switch (view.getId()) {
             case R.id.btnDisablePlugin:
-                sendDataWedgeIntentWithExtra(ACTION_SCANNERINPUTPLUGIN, EXTRA_PARAMETER, "DISABLE_PLUGIN");
+                sendDataWedgeIntentWithExtra(ACTION_DATAWEDGE, EXTRA_SCANNERINPUTPLUGIN, "DISABLE_PLUGIN");
                 break;
             case R.id.btnEnablePlugin:
-                sendDataWedgeIntentWithExtra(ACTION_SCANNERINPUTPLUGIN, EXTRA_PARAMETER, "ENABLE_PLUGIN");
+                sendDataWedgeIntentWithExtra(ACTION_DATAWEDGE, EXTRA_SCANNERINPUTPLUGIN, "ENABLE_PLUGIN");
                 break;
             case R.id.btnSuspendPlugin:
                 if (okToSuspend)
-                    sendDataWedgeIntentWithExtra(ACTION_SCANNERINPUTPLUGIN, EXTRA_PARAMETER, "SUSPEND_PLUGIN");
+                    sendDataWedgeIntentWithExtra(ACTION_DATAWEDGE, EXTRA_SCANNERINPUTPLUGIN, "SUSPEND_PLUGIN");
                 break;
             case R.id.btnResumePlugin:
-                sendDataWedgeIntentWithExtra(ACTION_SCANNERINPUTPLUGIN, EXTRA_PARAMETER, "RESUME_PLUGIN");
+                sendDataWedgeIntentWithExtra(ACTION_DATAWEDGE, EXTRA_SCANNERINPUTPLUGIN, "RESUME_PLUGIN");
                 break;
         }
     }
