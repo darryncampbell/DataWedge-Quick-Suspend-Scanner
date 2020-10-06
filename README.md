@@ -1,3 +1,6 @@
+*Please be aware that this application / sample is provided as-is for demonstration purposes without any guarantee of support*
+=========================================================
+
 # DataWedge Quick Suspend Scanner
 
 Most applications will need to temporarily disable the barcode scanner during their lifecycle.  There are **two** ways to achieve this with DataWedge, both using the [ScannerInputPlugin API](https://techdocs.zebra.com/datawedge/latest/guide/api/scannerinputplugin/): Enable / Disable or Resume / Suspend:
