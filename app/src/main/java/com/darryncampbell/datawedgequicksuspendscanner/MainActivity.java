@@ -16,12 +16,17 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 
 public class MainActivity extends AppCompatActivity implements View.OnClickListener {
 
+    private static final String ACTION_RESULT_DATAWEDGE = "com.symbol.datawedge.api.RESULT_ACTION";
     private static final String ACTION_RESULT_NOTIFICATION = "com.symbol.datawedge.api.NOTIFICATION_ACTION";
     private static final String EXTRA_RESULT_NOTIFICATION = "com.symbol.datawedge.api.NOTIFICATION";
     private static final String EXTRA_RESULT_NOTIFICATION_TYPE = "NOTIFICATION_TYPE";
+    private static final String EXTRA_RESULT_SCANNER_STATUS = "com.symbol.datawedge.api.RESULT_SCANNER_STATUS";
+    private static final String EXTRA_GET_ACTIVE_PROFILE = "com.symbol.datawedge.api.GET_ACTIVE_PROFILE";
+    private static final String EXTRA_RESULT_GET_PROFILE_LIST = "com.symbol.datawedge.api.RESULT_GET_PROFILES_LIST";
     private static final String EXTRA_KEY_VALUE_SCANNER_STATUS = "SCANNER_STATUS";
     private static final String EXTRA_KEY_VALUE_NOTIFICATION_STATUS = "STATUS";
     private static final String EXTRA_KEY_VALUE_NOTIFICATION_PROFILE_NAME = "PROFILE_NAME";
@@ -34,17 +39,20 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     private static final String EXTRA_SCANNER_STATUS_WAITING = "WAITING";
     private static final String EXTRA_SCANNER_STATUS_SCANNING = "SCANNING";
     private static final String EXTRA_SCANNERINPUTPLUGIN = "com.symbol.datawedge.api.SCANNER_INPUT_PLUGIN";
+    private static final String EXTRA_RESULT_GET_ACTIVE_PROFILE = "com.symbol.datawedge.api.RESULT_GET_ACTIVE_PROFILE";
+    private static final String EXTRA_GET_PROFILES_LIST = "com.symbol.datawedge.api.GET_PROFILES_LIST";
+    private static final String EXTRA_GET_SCANNER_STATUS = "com.symbol.datawedge.api.GET_SCANNER_STATUS";
+    private static final String EXTRA_EMPTY = "";
     private final String EXTRA_PROFILE_NAME = "DW Quick Suspend Profile";
     private final String EXTRA_INTENT_ACTION = "com.zebra.quicksuspendscanner.ACTION";
     private final String LOG_TAG = "DW Quick Suspend";
     private boolean okToSuspend = false;
+    private int retryCounter = 0;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        CreateDWProfile();
-        RegisterToReceiveScannerNotifications();
         Button btnEnablePlugin = findViewById(R.id.btnEnablePlugin);
         Button btnDisablePlugin = findViewById(R.id.btnDisablePlugin);
         Button btnResumePlugin = findViewById(R.id.btnResumePlugin);
@@ -61,9 +69,11 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         super.onResume();
         IntentFilter filter = new IntentFilter();
         filter.addAction(ACTION_RESULT_NOTIFICATION);
+        filter.addAction(ACTION_RESULT_DATAWEDGE);//  DW 6.2
         filter.addCategory(Intent.CATEGORY_DEFAULT);
         filter.addAction(EXTRA_INTENT_ACTION);
         registerReceiver(myBroadcastReceiver, filter);
+        GetProfilesList();
     }
 
     @Override
@@ -71,6 +81,21 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     {
         super.onPause();
         unregisterReceiver(myBroadcastReceiver);
+    }
+
+    private void GetProfilesList()
+    {
+        sendDataWedgeIntentWithExtra(ACTION_DATAWEDGE, EXTRA_GET_PROFILES_LIST, EXTRA_EMPTY);
+    }
+
+    private void GetActiveProfile()
+    {
+        sendDataWedgeIntentWithExtra(ACTION_DATAWEDGE, EXTRA_GET_ACTIVE_PROFILE, EXTRA_EMPTY);
+    }
+
+    private void GetScannerStatus()
+    {
+        sendDataWedgeIntentWithExtra(ACTION_DATAWEDGE, EXTRA_GET_SCANNER_STATUS, EXTRA_EMPTY);
     }
 
     private void CreateDWProfile()
@@ -162,6 +187,47 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     //  Catch if the UI does not exist when we receive the broadcast... this is not designed to be a production app
                 }
             }
+            else if (action.equals(ACTION_RESULT_DATAWEDGE))
+            {
+                if (intent.hasExtra(EXTRA_RESULT_GET_ACTIVE_PROFILE))
+                {
+                    //  activeProfile should be EXTRA_PROFILE_NAME, if it is then register for scanner notifications, if not then wait and retry (3 times)
+                    String activeProfile = intent.getStringExtra(EXTRA_RESULT_GET_ACTIVE_PROFILE);
+                    if (activeProfile.equalsIgnoreCase(EXTRA_PROFILE_NAME))
+                    {
+                        GetScannerStatus();
+                        RegisterToReceiveScannerNotifications();
+                    }
+                    else
+                    {
+                        retryCounter++;
+                        if (retryCounter <= 10)
+                        {
+                            try {
+                                Thread.sleep(300);
+                                GetActiveProfile();
+                            } catch (InterruptedException e) { }
+                        }
+                        else
+                        {
+                            displayScanerStatus("Error: Could not create profile");
+                        }
+                    }
+                }
+                else if (intent.hasExtra(EXTRA_RESULT_GET_PROFILE_LIST))
+                {
+                    //  profilesList should contain EXTRA_PROFILE_NAME, if it does not then create the profile and call getActiveProfile
+                    String[] profilesList = intent.getStringArrayExtra(EXTRA_RESULT_GET_PROFILE_LIST);
+                    if (Arrays.asList(profilesList).contains(EXTRA_PROFILE_NAME))
+                        GetActiveProfile();
+                    else
+                        CreateDWProfile();
+                }
+                else if (intent.hasExtra(EXTRA_RESULT_SCANNER_STATUS))
+                {
+                    ProcessScannerStatus(intent.getStringExtra(EXTRA_RESULT_SCANNER_STATUS));
+                }
+            }
             else if (action.equals(ACTION_RESULT_NOTIFICATION))
             {
                 //  6.3 API for RegisterForNotification
@@ -176,19 +242,24 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                         if (associatedProfile.equals(EXTRA_PROFILE_NAME))
                         {
                             String scannerStatus = extras.getString(EXTRA_KEY_VALUE_NOTIFICATION_STATUS);
-                            String userReadableScannerStatus = "Scanner status: " + scannerStatus;
-                            if (scannerStatus.equals(EXTRA_SCANNER_STATUS_WAITING) || scannerStatus.equals(EXTRA_SCANNER_STATUS_SCANNING))
-                                okToSuspend = true;
-                            else
-                                okToSuspend = false;
-                            displayScanerStatus(scannerStatus);
-                            Log.i(LOG_TAG, userReadableScannerStatus);
+                            ProcessScannerStatus(scannerStatus);
                         }
                     }
                 }
             }
         }
     };
+
+    private void ProcessScannerStatus(String scannerStatus)
+    {
+        String userReadableScannerStatus = "Scanner status: " + scannerStatus;
+        if (scannerStatus.equals(EXTRA_SCANNER_STATUS_WAITING) || scannerStatus.equals(EXTRA_SCANNER_STATUS_SCANNING))
+            okToSuspend = true;
+        else
+            okToSuspend = false;
+        displayScanerStatus(scannerStatus);
+        Log.i(LOG_TAG, userReadableScannerStatus);
+    }
 
     @Override
     public void onClick(View view) {
